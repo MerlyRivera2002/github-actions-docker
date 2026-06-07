@@ -1,0 +1,47 @@
+name: Construcción de imagen y despliegue con Docker en EC2
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    name: Construir imagen Docker y desplegar
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and Push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: merly2002/github-actions-docker:flaskapp
+
+      - name: Deploy on EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          script: |
+            docker image pull merly2002/github-actions-docker:flaskapp
+
+            docker container stop contflask || true
+
+            docker container rm contflask || true
+
+            docker container run -d \
+              --name contflask \
+              -p 80:5000 \
+              merly2002/github-actions-docker:flaskapp
